@@ -194,7 +194,7 @@ class RobotPlot(object):
         try:
             self._ani = animation.FuncAnimation(
                 self._fig, self.animateEE, steps,
-                interval=10, blit=True
+                interval=self._dt*1000, blit=True
             )
         except TypeError as err:
             print("Type error in animation")
