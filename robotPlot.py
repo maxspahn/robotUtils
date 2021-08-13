@@ -7,7 +7,13 @@ from numpyFk import numpyFk
 
 class RobotPlot(object):
 
-    """Plotting robot trajectories for various robots"""
+    """Plotting robot trajectories for various robots
+    types:  0 : point robot
+            1 : planar robotic arm
+            2 :
+            3 :
+            4 : point robot with orientation
+    """
 
     def __init__(self, qs, fk, m, types, dt=0.01):
         self._dt = dt
@@ -38,6 +44,8 @@ class RobotPlot(object):
                     fk = np.array(self._fk(self._qs[j][i], self._dims[j])[0:self._m])
                 elif self._types[j] == 0:
                     fk = np.array(self._fk(self._qs[j][i]))
+                elif self._types[j] == 4:
+                    fk = np.array(self._fk(self._qs[j][i]))[:, 0]
                 fks[i, :] = fk
             self._fks.append(fks)
 
@@ -50,7 +58,7 @@ class RobotPlot(object):
                 fk[i, :] = np.array(self._fk(q[i]))
             self._axs[nbAx].plot(fk[:, 0], fk[:, 1])
 
-    def initFig(self, n, m, fig=None, lims=[(-5, 5), (-5, 5)]):
+    def initFig(self, n, m, fig=None, lims=[(-5, 5), (-5, 5)], grid=False):
         if not fig:
             self._fig, axs = plt.subplots(n, m, figsize=(m*4, n*4))
         if (n == 1) and (m == 1):
@@ -60,6 +68,13 @@ class RobotPlot(object):
         for i in range(self._nbSol):
             self._axs[i].set_xlim([lims[0][0], lims[0][1]])
             self._axs[i].set_ylim([lims[1][0], lims[1][1]])
+            if grid:
+                minor_xticks = np.arange(lims[0][0], lims[0][1], 0.25)
+                minor_yticks = np.arange(lims[1][0], lims[1][1], 0.25)
+                self._axs[i].set_xticks(minor_xticks, minor=True)
+                self._axs[i].set_yticks(minor_yticks, minor=True)
+                self._axs[i].grid(which='major', alpha=0.8)
+                self._axs[i].grid(which='minor', alpha=0.2)
 
     def getAx(self, i):
         return self._axs[i]
@@ -103,6 +118,9 @@ class RobotPlot(object):
         for i in range(len(self._goalAxes)):
             for nbAx in self._goalAxes[i]:
                 goal = self._goals[i]
+                if isinstance(goal, np.ndarray):
+                    goalPoints.append(self._axs[nbAx].plot(goal[0], goal[1], 'g.')[0])
+                    continue
                 start = max(0, num - 100)
                 steps = num-start
                 xs = np.zeros((steps, 2))
@@ -131,6 +149,35 @@ class RobotPlot(object):
             if self._types[j] == 0 or self._types[j] == 3:
                 continue
             t = min(t, self._ns[j] - 1)
+            if self._types[j] == 4:
+                a = self._qs[j][t, 2]
+                R = np.array([
+                                [np.cos(a), -np.sin(a)],
+                                [np.sin(a), np.cos(a)]
+                            ])
+                offset = np.array([-0.75, -0.30])
+                offset_real = np.dot(R, offset)
+                x = self._qs[j][t, 0:2]
+                vehicle = plt.Rectangle(x + offset_real , 1.5, 0.6, angle=np.rad2deg(a))
+                self._patches.append(self._axs[j].add_patch(vehicle))
+                dx = np.dot(R, np.array([1.5, 0.0]))
+                oriArrow1 = plt.Arrow(x[0], x[1], dx[0], dx[1], width=0.3)
+                self._patches.append(self._axs[j].add_patch(oriArrow1))
+                if len(self._qs[j][t, :]) == 3:
+                    continue
+                offset_arm_start = np.array([0.2, 0.0])
+                offset_arm_start_real = np.dot(R, offset_arm_start)
+                offset_arm = np.array([-0.0, -0.025])
+                a_arm = a + self._qs[j][t, 3]
+                R = np.array([
+                                [np.cos(a_arm), -np.sin(a_arm)],
+                                [np.sin(a_arm), np.cos(a_arm)]
+                            ])
+                offset_arm_real = np.dot(R, offset_arm)
+                x = self._qs[j][t, 0:2]
+                arm = plt.Rectangle(x + offset_arm_real + offset_arm_start_real , 1.0, 0.05, angle=np.rad2deg(a_arm), color='black')
+                self._patches.append(self._axs[j].add_patch(arm))
+                continue
             joints = []
             links = []
             offset = np.array([-0.00, -0.05])
@@ -152,7 +199,6 @@ class RobotPlot(object):
                                 [np.cos(a), -np.sin(a)],
                                 [np.sin(a), np.cos(a)]
                             ])
-                r = np.identity(2)
                 offset_real = np.dot(R, offset)
                 joint = plt.Circle(xi[0:2], radius=0.1)
                 link = plt.Rectangle(xi[0:2] + offset_real, 1.0, 0.1, angle = np.rad2deg(xi[2]))
@@ -194,7 +240,7 @@ class RobotPlot(object):
         try:
             self._ani = animation.FuncAnimation(
                 self._fig, self.animateEE, steps,
-                interval=self._dt*1000, blit=True
+                interval=self._dt*100, blit=True
             )
         except TypeError as err:
             print("Type error in animation")

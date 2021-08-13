@@ -2,7 +2,7 @@ import casadi as ca
 import numpy as np
 
 def casadiFk(q, n, endlink=0.0):
-    fk = np.array([0.0, 0.2, q[0]])
+    fk = ca.SX(np.array([0.0, 0.2, q[0]]))
     for i in range(1, n+1):
         fk[0] += ca.cos(fk[2]) * 1.0
         fk[1] += ca.sin(fk[2]) * 1.0
